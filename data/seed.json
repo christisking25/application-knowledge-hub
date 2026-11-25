@@ -1,0 +1,89 @@
+{
+  "users": {
+    "alice": {"name": "Alice (Enterprise Architect)", "groups": ["all-staff", "architecture", "engineering"]},
+    "sam":   {"name": "Sam (Store Ops Analyst)",     "groups": ["all-staff", "store-ops"]},
+    "riley": {"name": "Riley (SRE on-call)",          "groups": ["all-staff", "engineering", "sre"]}
+  },
+  "applications": [
+    {"id": "orderhub",   "name": "OrderHub",        "owner": "Commerce Platform", "capabilities": ["order capture", "order orchestration", "returns"], "depends_on": ["pricing", "inventory", "payments"], "integrates_with": ["loyalty"]},
+    {"id": "pricing",    "name": "Pricing Engine",  "owner": "Merchandising Tech", "capabilities": ["price calculation", "promotions", "markdowns"], "depends_on": ["productcat"], "integrates_with": []},
+    {"id": "inventory",  "name": "InventorySync",   "owner": "Supply Chain Tech", "capabilities": ["stock levels", "store replenishment", "reservations"], "depends_on": ["productcat"], "integrates_with": ["storeops"]},
+    {"id": "loyalty",    "name": "Loyalty Points",  "owner": "Customer Tech", "capabilities": ["points accrual", "redemption", "member profile"], "depends_on": ["payments"], "integrates_with": ["orderhub"]},
+    {"id": "payments",   "name": "Payments Gateway","owner": "Financial Services Tech", "capabilities": ["authorization", "settlement", "refunds"], "depends_on": [], "integrates_with": []},
+    {"id": "productcat", "name": "Product Catalog", "owner": "Merchandising Tech", "capabilities": ["product master data", "attributes", "hierarchy"], "depends_on": [], "integrates_with": []},
+    {"id": "storeops",   "name": "StoreOps Portal", "owner": "", "capabilities": ["store tasks", "shelf labels", "store dashboards"], "depends_on": ["inventory", "pricing"], "integrates_with": []}
+  ],
+  "documents": [
+    {
+      "id": "CONF-101", "source": "confluence", "doc_type": "architecture", "app": "orderhub",
+      "title": "OrderHub Solution Architecture",
+      "url": "https://confluence.example.com/display/COMM/OrderHub+Architecture",
+      "owner": "Commerce Platform", "updated_at": "2026-10-02", "acl": ["engineering", "architecture"],
+      "body": "## Overview\nOrderHub is the system of record for customer orders across web, app and store channels. It captures orders, orchestrates fulfilment and manages returns.\n\n## Integrations\nOrderHub calls the Pricing Engine synchronously over REST to price the cart at checkout. Stock is reserved in InventorySync through an event on the order-created Kafka topic. Payment authorization is delegated to the Payments Gateway. Loyalty points are accrued asynchronously after the order is invoiced.\n\n## Non-functional\nCheckout latency target is 400 ms at p95. If the Pricing Engine is unavailable, OrderHub falls back to the last cached price for up to 15 minutes before blocking checkout."
+    },
+    {
+      "id": "CONF-102", "source": "confluence", "doc_type": "requirements", "app": "orderhub",
+      "title": "Returns Requirements v3",
+      "url": "https://confluence.example.com/display/COMM/Returns+Requirements",
+      "owner": "Commerce Platform", "updated_at": "2026-08-14", "acl": ["all-staff"],
+      "body": "## Business rules\nCustomers may return most items within 90 days with proof of purchase. Seasonal items have a 30 day return window. Refunds are issued to the original payment method through the Payments Gateway.\n\n## Loyalty impact\nWhen an order is returned, loyalty points earned on the returned items are reversed in Loyalty Points within 24 hours."
+    },
+    {
+      "id": "CONF-201", "source": "confluence", "doc_type": "architecture", "app": "pricing",
+      "title": "Pricing Engine Design",
+      "url": "https://confluence.example.com/display/MERCH/Pricing+Engine",
+      "owner": "Merchandising Tech", "updated_at": "2025-03-11", "acl": ["engineering", "architecture"],
+      "body": "## Overview\nThe Pricing Engine computes regular price, promotional price and markdowns per store and channel. Prices are recalculated nightly in a batch and promotions are applied in real time.\n\n## Data\nProduct attributes and hierarchy come from the Product Catalog. Price changes are published to StoreOps Portal for shelf label printing."
+    },
+    {
+      "id": "SP-301", "source": "sharepoint", "doc_type": "process", "app": "storeops",
+      "title": "Shelf Label Price Change Process",
+      "url": "https://sharepoint.example.com/sites/storeops/Shared%20Documents/price-change-process.docx",
+      "owner": "", "updated_at": "2026-06-30", "acl": ["store-ops", "architecture"],
+      "body": "## Process\nEvery morning at 6 AM store associates open StoreOps Portal and print shelf labels for the price changes received overnight from the Pricing Engine. Labels must be hung before the store opens.\n\n## Exceptions\nIf a price change is missing, the associate raises a ticket in ServiceNow under the Pricing category."
+    },
+    {
+      "id": "JIRA-OH-482", "source": "jira", "doc_type": "ticket", "app": "orderhub",
+      "title": "OH-482: Checkout fails when Pricing Engine times out",
+      "url": "https://jira.example.com/browse/OH-482",
+      "owner": "Commerce Platform", "updated_at": "2026-11-10", "acl": ["engineering"],
+      "body": "## Description\nDuring the Black Friday load test, checkout returned HTTP 500 after the Pricing Engine exceeded its 2 second timeout. The cached price fallback did not trigger because the cache TTL had been set to zero in the prod config.\n\n## Resolution\nRestored the cache TTL to 15 minutes and added an alert on pricing timeouts above 1 percent."
+    },
+    {
+      "id": "SNOW-INC-7731", "source": "servicenow", "doc_type": "incident", "app": "inventory",
+      "title": "INC0007731: Store stock counts out of sync",
+      "url": "https://servicenow.example.com/nav_to.do?uri=incident.do?sysparm_query=number=INC0007731",
+      "owner": "Supply Chain Tech", "updated_at": "2026-11-18", "acl": ["sre", "engineering"],
+      "body": "## Symptoms\nStoreOps Portal showed negative stock for 140 stores. Online orders were accepted for items not physically on hand.\n\n## Root cause\nThe InventorySync consumer for the order-created topic lagged by 3 hours after a partition rebalance, so reservations were not applied.\n\n## Runbook\nCheck consumer lag in the monitoring dashboard. If lag exceeds 10 minutes, restart the inventory-reservation consumer group and replay from the last committed offset."
+    },
+    {
+      "id": "CONF-401", "source": "confluence", "doc_type": "architecture", "app": "loyalty",
+      "title": "Loyalty Points Accrual Flow",
+      "url": "https://confluence.example.com/display/CUST/Loyalty+Accrual",
+      "owner": "Customer Tech", "updated_at": "2026-09-21", "acl": ["all-staff"],
+      "body": "## Accrual\nMembers earn points on eligible purchases. OrderHub emits an order-invoiced event and Loyalty Points credits the member account within 5 minutes.\n\n## Redemption\nPoints can be redeemed at checkout as a tender type. Redemption is authorized through the Payments Gateway like any other tender."
+    },
+    {
+      "id": "SP-501", "source": "sharepoint", "doc_type": "policy", "app": "payments",
+      "title": "Payments Data Handling Standard",
+      "url": "https://sharepoint.example.com/sites/fintech/Shared%20Documents/payments-standard.pdf",
+      "owner": "Financial Services Tech", "updated_at": "2026-05-02", "acl": ["architecture"],
+      "body": "## Scope\nAll systems that process cardholder data must be in PCI scope and tokenize card numbers through the Payments Gateway. Raw card numbers must never be logged or stored by consuming applications.\n\n## Refunds\nRefunds must reference the original authorization ID."
+    },
+    {
+      "id": "REG-PRODUCTCAT", "source": "app_registry", "doc_type": "metadata", "app": "productcat",
+      "title": "Product Catalog - Application Registry Entry",
+      "url": "https://apm.example.com/apps/productcat",
+      "owner": "Merchandising Tech", "updated_at": "2026-11-01", "acl": ["all-staff"],
+      "body": "## Summary\nProduct Catalog is the master data system for products, attributes and the merchandise hierarchy. Consumers include the Pricing Engine and InventorySync. Lifecycle status is Invest. Hosting is Azure, region Canada Central."
+    }
+  ],
+  "eval_set": [
+    {"query": "What happens at checkout if the pricing service is down?", "user": "alice", "expected": ["CONF-101", "JIRA-OH-482"]},
+    {"query": "How long do customers have to return seasonal items?", "user": "sam", "expected": ["CONF-102"]},
+    {"query": "stock counts negative in stores, how do I fix consumer lag", "user": "riley", "expected": ["SNOW-INC-7731"]},
+    {"query": "when are shelf labels printed for price changes", "user": "sam", "expected": ["SP-301"]},
+    {"query": "are loyalty points reversed on a return", "user": "sam", "expected": ["CONF-102", "CONF-401"]},
+    {"query": "can apps log card numbers", "user": "alice", "expected": ["SP-501"]}
+  ]
+}

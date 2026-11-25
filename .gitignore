@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+.pytest_cache/
+resume/
+*.pdf
+*.png
+.DS_Store
